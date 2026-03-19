@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>QR Test Site</title>
+	<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+	<style>
+		:root {
+			--bg: #f4f6f8;
+			--card: #ffffff;
+			--line: #dde3ea;
+			--text: #1f2a37;
+			--muted: #64748b;
+			--accent: #0f766e;
+			--accent-hover: #0b5f58;
+			--danger: #b91c1c;
+		}
+
+		* {
+			box-sizing: border-box;
+			margin: 0;
+			padding: 0;
+		}
+
+		body {
+			font-family: "Segoe UI", "Yu Gothic UI", Meiryo, sans-serif;
+			background: linear-gradient(180deg, #f8fafc 0%, var(--bg) 100%);
+			color: var(--text);
+			min-height: 100vh;
+			padding: 24px;
+		}
+
+		.wrap {
+			max-width: 860px;
+			margin: 0 auto;
+		}
+
+		.panel {
+			background: var(--card);
+			border: 1px solid var(--line);
+			border-radius: 12px;
+			box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+		}
+
+		.header {
+			padding: 20px 24px;
+			margin-bottom: 18px;
+		}
+
+		h1 {
+			font-size: 1.25rem;
+			font-weight: 700;
+			margin-bottom: 6px;
+		}
+
+		.sub {
+			color: var(--muted);
+			font-size: 0.92rem;
+		}
+
+		.form {
+			padding: 20px 24px;
+			margin-bottom: 18px;
+			display: grid;
+			gap: 12px;
+		}
+
+		.row {
+			display: flex;
+			gap: 10px;
+		}
+
+		input[type="text"] {
+			flex: 1;
+			border: 1px solid #cbd5e1;
+			border-radius: 8px;
+			padding: 11px 12px;
+			font-size: 0.96rem;
+			outline: none;
+		}
+
+		input[type="text"]:focus {
+			border-color: var(--accent);
+			box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
+		}
+
+		button {
+			border: 1px solid transparent;
+			border-radius: 8px;
+			padding: 10px 14px;
+			font-size: 0.9rem;
+			cursor: pointer;
+			background: #f8fafc;
+			color: var(--text);
+		}
+
+		.btn-primary {
+			background: var(--accent);
+			color: #fff;
+			white-space: nowrap;
+		}
+
+		.btn-primary:hover {
+			background: var(--accent-hover);
+		}
+
+		.grid {
+			display: grid;
+			grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+			gap: 14px;
+		}
+
+		.card {
+			padding: 16px;
+			display: grid;
+			place-items: center;
+			gap: 10px;
+			text-align: center;
+		}
+
+		.label {
+			color: var(--muted);
+			font-size: 0.78rem;
+			line-height: 1.3;
+			word-break: break-all;
+		}
+
+		.actions {
+			display: flex;
+			gap: 8px;
+		}
+
+		.btn-danger {
+			border-color: #fecaca;
+			color: var(--danger);
+			background: #fff5f5;
+		}
+
+		.btn-danger:hover {
+			background: #ffe8e8;
+		}
+
+		.empty {
+			grid-column: 1 / -1;
+			padding: 28px;
+			text-align: center;
+			color: var(--muted);
+			border: 1px dashed var(--line);
+			border-radius: 12px;
+			background: #fff;
+		}
+
+		@media (max-width: 640px) {
+			body {
+				padding: 14px;
+			}
+
+			.header,
+			.form {
+				padding: 16px;
+			}
+
+			.row {
+				flex-direction: column;
+			}
+		}
+	</style>
+</head>
+<body>
+	<div class="wrap">
+		<section class="panel header">
+			<h1>QRコード テストサイト</h1>
+			<p class="sub">URLまたはテキストを入力して、QRコードを生成して公開確認できます。</p>
+		</section>
+
+		<section class="panel form">
+			<label for="qrInput">QRにしたい文字列</label>
+			<div class="row">
+				<input id="qrInput" type="text" placeholder="https://example.com など" />
+				<button class="btn-primary" id="generateBtn" type="button">QRを生成</button>
+			</div>
+		</section>
+
+		<section id="qrGrid" class="grid" aria-live="polite"></section>
+	</div>
+
+	<script>
+		const STORAGE_KEY = "qr-test-items";
+		const grid = document.getElementById("qrGrid");
+		const input = document.getElementById("qrInput");
+		const generateBtn = document.getElementById("generateBtn");
+		const items = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+
+		function saveItems() {
+			localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+		}
+
+		function renderEmpty() {
+			const empty = document.createElement("div");
+			empty.className = "empty";
+			empty.textContent = "まだQRコードがありません。上の入力欄から作成してください。";
+			grid.appendChild(empty);
+		}
+
+		function downloadCanvas(canvas) {
+			const link = document.createElement("a");
+			link.href = canvas.toDataURL("image/png");
+			link.download = "qrcode.png";
+			link.click();
+		}
+
+		function renderCard(text, index) {
+			const card = document.createElement("article");
+			card.className = "panel card";
+
+			const canvas = document.createElement("canvas");
+			QRCode.toCanvas(canvas, text, { width: 168, margin: 1 }, (err) => {
+				if (err) {
+					console.error(err);
+				}
+			});
+
+			const label = document.createElement("p");
+			label.className = "label";
+			label.textContent = text;
+
+			const actions = document.createElement("div");
+			actions.className = "actions";
+
+			const saveBtn = document.createElement("button");
+			saveBtn.type = "button";
+			saveBtn.textContent = "保存";
+			saveBtn.addEventListener("click", () => downloadCanvas(canvas));
+
+			const deleteBtn = document.createElement("button");
+			deleteBtn.type = "button";
+			deleteBtn.className = "btn-danger";
+			deleteBtn.textContent = "削除";
+			deleteBtn.addEventListener("click", () => {
+				items.splice(index, 1);
+				saveItems();
+				renderAll();
+			});
+
+			actions.appendChild(saveBtn);
+			actions.appendChild(deleteBtn);
+			card.appendChild(canvas);
+			card.appendChild(label);
+			card.appendChild(actions);
+			grid.appendChild(card);
+		}
+
+		function renderAll() {
+			grid.innerHTML = "";
+			if (items.length === 0) {
+				renderEmpty();
+				return;
+			}
+
+			items.forEach((text, index) => {
+				renderCard(text, index);
+			});
+		}
+
+		function addQr() {
+			const value = input.value.trim();
+			if (!value) {
+				input.focus();
+				return;
+			}
+
+			items.push(value);
+			saveItems();
+			input.value = "";
+			renderAll();
+			input.focus();
+		}
+
+		generateBtn.addEventListener("click", addQr);
+		input.addEventListener("keydown", (event) => {
+			if (event.key === "Enter") {
+				addQr();
+			}
+		});
+
+		renderAll();
+	</script>
+</body>
+</html>
